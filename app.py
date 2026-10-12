@@ -1,118 +1,124 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
+import os
 
-# 1. ตั้งค่าหน้าตาเว็บแอปพลิเคชัน
-st.set_page_config(page_title="Logistics Chat Tutor", page_icon="🚛", layout="centered")
+# 1. ตั้งค่าหน้าตาเว็บแอป
+st.set_page_config(page_title="Logistics Chat Tutor & Dashboard", page_icon="📊", layout="centered")
+
+# ชื่อไฟล์ฐานข้อมูลสำหรับบันทึกคำถามนักศึกษา
+DATA_FILE = "student_logs.csv"
+
+# ฟังก์ชันสำหรับโหลดและบันทึกข้อมูล
+def load_logs():
+    if os.path.exists(DATA_FILE):
+        return pd.read_csv(DATA_FILE)
+    else:
+        return pd.DataFrame(columns=["Timestamp", "Student_Name", "Chapter", "Question"])
+
+def save_log(student_name, chapter, question):
+    df = load_logs()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_data = pd.DataFrame([[now, student_name, chapter, question]], 
+                            columns=["Timestamp", "Student_Name", "Chapter", "Question"])
+    df = pd.concat([df, new_data], ignore_index=True)
+    df.to_csv(DATA_FILE, index=False)
 
 # ==========================================
-# 🛠️ ส่วนที่ 1: เมนูด้านข้างสำหรับเลือกบทเรียน (ไม่ต้องลบโค้ดเก่า)
+# 🛠️ แถบเมนูด้านข้าง (Sidebar)
 # ==========================================
-st.sidebar.title("📚 เมนูบทเรียน")
-st.sidebar.markdown("อาจารย์สามารถเพิ่มบทเรียนใหม่ ๆ ตรงเมนูนี้ได้ในอนาคตครับ")
-
-# แถบให้นักศึกษาเลือกบทที่ต้องการเรียน
-chapter = st.sidebar.selectbox(
-    "👉 เลือกบทเรียนที่ต้องการติว :",
-    ["บทที่ 9-10: การจัดเส้นทาง (VRP)", "บทที่ 6: แบบจำลองการขนส่ง (Transport Model)"]
-)
+st.sidebar.title("📚 ระบบติวเตอร์ & Dashboard")
+mode = st.sidebar.radio("เลือกโหมดการใช้งาน:", ["🎓 สำหรับนักศึกษา (ถามคำถาม)", "📊 สำหรับอาจารย์ (Dashboard)"])
 
 # ==========================================
-# 🚛 ส่วนที่ 2: เนื้อหาบทที่ 9-10 (VRP)
+# 🎓 โหมดที่ 1: สำหรับนักศึกษาพิมพ์ถาม + บันทึกข้อมูล
 # ==========================================
-if chapter == "บทที่ 9-10: การจัดเส้นทาง (VRP)":
-    st.title("🚛 VRP Chat Tutor (อ.เมือง จ.หนองบัวลำภู)")
-    st.subheader("ระบบผู้ช่วยตอบคำถามวิชาโลจิสติกส์ บทที่ 9-10")
+if mode == "🎓 สำหรับนักศึกษา (ถามคำถาม)":
+    st.title("🚛 Logistics Tutor 24 ชม.")
+    st.markdown("ยินดีต้อนรับนักศึกษา! กรุณาพิมพ์ชื่อ/รหัสนักศึกษา และพิมพ์คำถามที่สงสัยลงในช่องด้านล่างได้เลยครับ")
+    
+    # ช่องกรอกชื่อ/รหัสนักศึกษา (เพื่อ Record ว่าใครถาม)
+    student_name = st.text_input("👤 ชื่อ-นามสกุล หรือ รหัสนักศึกษา :", placeholder="เช่น นายสมชาย ใจดี (65012345)")
+    
+    chapter = st.selectbox("📖 เลือกบทเรียนที่ต้องการถาม :", 
+                           ["บทที่ 9-10: การจัดเส้นทาง (VRP)", "บทที่ 6: แบบจำลองการขนส่ง (Transport Model)"])
+    
+    user_query = st.text_input("💬 พิมพ์คำถามที่ต้องการให้ AI ช่วยตอบ :", placeholder="เช่น VRP คืออะไร? / S15 คิดยังไง? / ขอวิธีทำ Least Cost")
 
-    st.markdown("""
-    สวัสดีครับนักศึกษา! พี่เป็น AI ผู้ช่วยสอนในเรื่อง **Vehicle Routing Problem (VRP)**
-    นักศึกษาสามารถ**พิมพ์คำถาม**ที่สงสัยเกี่ยวกับโจทย์ VRP (Assignment 6 หน้า 14) 
-    หรือพิมพ์ตรวจคำตอบค่า Saving ลงในช่องด้านล่างนี้ได้เลยครับ 💬
-    """)
-
-    nodes = ["0.เมือง", "1.นากลาง", "2.โนนสัง", "3.ศรีบุญเรือง", "4.สุวรรณคูหา", "5.นาวัง"]
-    demands = [0, 90, 65, 85, 80, 60]
-    d_0 = [0, 37, 43, 30, 55, 59]
-
-    user_query = st.text_input("💬 พิมพ์คำถามเรื่อง VRP ตรงนี้ครับ :", placeholder="ตัวอย่างเช่น: VRP คืออะไร? / S12 คิดยังไง? / ขอคำตอบ")
-
-    if user_query:
-        q = user_query.lower()
-        st.write("---")
-        st.markdown("### 🤖 คำตอบจาก AI Tutor (VRP):")
-        
-        if "vrp" in q or "คืออะไร" in q:
-            st.markdown("**VRP** คือ ปัญหาการจัดเส้นทางเดินรถเพื่อส่งสินค้าให้ลูกค้าครบทุกจุดโดยใช้ระยะทางรวมน้อยที่สุด ภายใต้พิกัดความจุรถ (โจทย์ข้อนี้คือไม่เกิน **150 ลัง** ครับ)")
-        elif "s12" in q:
-            st.markdown("สูตร $S_{12} = d_{01} + d_{02} - d_{12}$ ➡️ แทนค่า $37 + 43 - 79 = $ **1** ครับผม!")
-        elif "s15" in q or "นาวัง" in q:
-            st.markdown("สูตร $S_{15} = d_{01} + d_{05} - d_{15}$ ➡️ แทนค่า $37 + 59 - 16 = $ **80** ครับผม! คู่นี้ประหยัดได้เยอะสุด")
-        elif "รถ" in q or "กี่คัน" in q or "เฉลย" in q or "คำตอบ" in q:
-            st.markdown("""
-            **เฉลยคำตอบ (โจทย์หนองบัวลำภู):** ใช้รถทั้งหมด **3 คัน**
-            * 🚛 **คันที่ 1:** เมือง -> นากลาง -> นาวัง -> สุวรรณคูหา -> เมือง (โหลดรวม 150 ลังพอดีเป๊ะ!)
-            * 🚛 **คันที่ 2:** เมือง -> โนนสัง -> ศรีบุญเรือง -> เมือง (โหลดรวม 150 ลังพอดีเป๊ะเช่นกัน!)
-            * 🚛 **คันที่ 3:** รถวิ่งเปล่า/สำรอง หรือเก็บตกจุดที่เหลือตามเงื่อนไข (ตามผลลัพธ์การคำนวณ)
-            """)
+    if st.button("🚀 ส่งคำถาม"):
+        if not student_name:
+            st.warning("⚠️ กรุณากรอกชื่อหรือรหัสนักศึกษาก่อนส่งคำถามนะครับ")
+        elif not user_query:
+            st.warning("⚠️ กรุณาพิมพ์คำถามด้วยนะครับ")
         else:
-            st.markdown("พี่เป็น AI ติวเตอร์ VRP ลองถามเช่น: *'VRP คืออะไร'*, *'S15 คิดยังไง'*, *'ขอคำตอบ'* ดูนะครับ")
-
-    st.write("---")
-    st.caption("📊 ตารางระยะทางและความต้องการ (Assignment 6) สำหรับดูประกอบ:")
-    df_info = pd.DataFrame({"อำเภอปลายทาง": nodes[1:], "ระยะทางจากเมือง (กม.)": d_0[1:], "ความต้องการ (ลัง)": demands[1:]})
-    st.dataframe(df_info, use_container_width=True)
+            # บันทึกข้อมูลเข้าระบบ (Record คนถาม, บทเรียน, คำถาม, เวลา)
+            save_log(student_name, chapter, user_query)
+            st.success("✅ บันทึกคำถามเรียบร้อยแล้ว!")
+            
+            # ส่วนการตอบของ AI ตามบทเรียน
+            st.write("---")
+            st.markdown("### 🤖 คำตอบจาก AI Tutor:")
+            q = user_query.lower()
+            
+            if chapter == "บทที่ 9-10: การจัดเส้นทาง (VRP)":
+                if "vrp" in q or "คืออะไร" in q:
+                    st.markdown("**VRP** คือ ปัญหาการจัดเส้นทางเดินรถเพื่อส่งสินค้าให้ลูกค้าครบทุกจุดโดยใช้ระยะทางรวมน้อยที่สุด ภายใต้พิกัดความจุรถ (โจทย์ข้อนี้คือไม่เกิน **150 ลัง** ครับ)")
+                elif "s15" in q:
+                    st.markdown("สูตร $S_{15} = d_{01} + d_{05} - d_{15}$ ➡️ แทนค่า $37 + 59 - 16 = $ **80** ครับผม!")
+                else:
+                    st.markdown(f"ขอบคุณสำหรับคำถาม **{user_query}** พี่ AI จะเก็บข้อมูลไว้ให้นักศึกษานะครับ (คำตอบเฉลย VRP: ใช้รถ 3 คัน)")
+            
+            elif chapter == "บทที่ 6: แบบจำลองการขนส่ง (Transport Model)":
+                if "northwest" in q:
+                    st.markdown("**วิธี Northwest Corner Rule** 🧭 จัดของจากช่องบนซ้ายสุดก่อนเสมอ 📊 ต้นทุนรวม = **4,200 บาท**")
+                elif "least cost" in q:
+                    st.markdown("**วิธี Least Cost Method** 💰 เลือกจัดของลงช่องที่ค่าขนส่งถูกที่สุดก่อน 📊 ต้นทุนรวม = **4,100 บาท**")
+                else:
+                    st.markdown(f"ขอบคุณสำหรับคำถาม **{user_query}** พี่ AI ได้บันทึกข้อสงสัยเรียบร้อยแล้วครับ")
 
 # ==========================================
-# 📦 ส่วนที่ 3: เนื้อหาบทที่ 6 (Transport Model)
+# 📊 โหมดที่ 2: สำหรับอาจารย์ (Dashboard วิเคราะห์ข้อมูล)
 # ==========================================
-elif chapter == "บทที่ 6: แบบจำลองการขนส่ง (Transport Model)":
-    st.title("📦 Transport Model Tutor (แบบจำลองการขนส่ง)")
-    st.subheader("ระบบผู้ช่วยตอบคำถามวิชาโลจิสติกส์ บทที่ 6 (ม.ศรีปทุม ขอนแก่น)")
-
-    st.markdown("""
-    สวัสดีครับนักศึกษา! พี่เป็น AI ผู้ช่วยสอนในเรื่อง **แบบจำลองการขนส่ง (Transportation Model)**
-    นักศึกษาสามารถ**พิมพ์คำถาม**ที่สงสัย หรือพิมพ์ตรวจสอบวิธีคิด Northwest / Least Cost / VAM ได้เลยครับ 💬
-    """)
-
-    user_query = st.text_input("💬 พิมพ์คำถามเรื่องแบบจำลองการขนส่งตรงนี้ครับ :", placeholder="ตัวอย่างเช่น: Northwest คืออะไร? / วิธีทำ Least Cost / เฉลยวิธี VAM")
-
-    if user_query:
-        q = user_query.lower()
-        st.write("---")
-        st.markdown("### 🤖 คำตอบจาก AI Tutor (Transport Model):")
+elif mode == "📊 สำหรับอาจารย์ (Dashboard)":
+    st.title("📊 Dashboard สรุปการเข้าใช้งานของนักศึกษา")
+    
+    # ระบบล็อกรหัสผ่านเข้า Dashboard สำหรับอาจารย์ (ตั้งรหัสได้ตามต้องการ)
+    password = st.text_input("🔒 กรุณากรอกรหัสผ่านสำหรับอาจารย์ :", type="password")
+    
+    if password == "1234":  # <--- อาจารย์สามารถเปลี่ยนรหัสผ่านตรงนี้ได้ครับ
+        st.success("🔓 เข้าสู่ระบบสำเร็จ")
         
-        if "northwest" in q or "มุมตะวันตก" in q:
-            st.markdown("""
-            **วิธีมุมตะวันตกเฉียงเหนือ (Northwest Corner Rule)** 🧭
-            จัดของจากช่องบนซ้ายสุดก่อนเสมอ ไม่สนใจค่าขนส่ง
-            * จัดสรรไปที่ D-A(100), E-A(200), E-B(100), F-B(100), F-C(200)
-            * **📊 ต้นทุนรวม (Total Cost):** = **4,200 บาท** ครับ!
-            """)
-        elif "least cost" in q or "ต้นทุนต่ำสุด" in q:
-            st.markdown("""
-            **วิธีต้นทุนต่ำสุด (Least Cost Method)** 💰
-            เลือกจัดของลงช่องที่ค่าขนส่งถูกที่สุดก่อนเพื่อประหยัดเงิน
-            * จัดสรรไปที่ D-C(100), E-C(100), E-B(200), F-A(300)
-            * **📊 ต้นทุนรวม (Total Cost):** = **4,100 บาท** ครับ! (ประหยัดกว่าวิธีแรก)
-            """)
-        elif "vogel" in q or "vam" in q or "โวเกล" in q:
-            st.markdown("""
-            **วิธีประมาณการของโวเกล (VAM)** 🦅
-            คำนวณค่าเสียโอกาส (Penalty) ของแต่ละแถวและคอลัมน์ก่อนจัดสรรสินค้า
-            * จัดสรรไปที่ D-C(100), E-A(200), E-B(100), F-A(100), F-B(100), F-C(100)
-            * **📊 ต้นทุนรวม (Total Cost):** = **4,400 บาท** ครับ!
-            """)
-        elif "คืออะไร" in q or "transport" in q:
-            st.markdown("**แบบจำลองการขนส่ง** คือ การวางแผนจัดสรรสินค้าจากแหล่งผลิตหลายแห่ง ไปตลาดยอดรับหลายแห่ง เพื่อให้ได้ **'ต้นทุนรวมต่ำที่สุด'** และพอกับ Supply/Demand ครับ")
+        df_logs = load_logs()
+        
+        if df_logs.empty:
+            st.info("ยังไม่มีข้อมูลการพิมพ์ถามของนักศึกษาในขณะนี้")
         else:
-            st.markdown("พี่เป็น AI ติวเตอร์แบบจำลองการขนส่ง ลองพิมพ์คำถามเช่น: *'Northwest คืออะไร'*, *'วิธีทำ Least Cost'*, *'เฉลยวิธี VAM'*")
-
-    st.write("---")
-    st.caption("📊 ตารางอัตราค่าขนส่งและข้อมูลโจทย์ (ตัวอย่างที่ 1 หน้า 3) สำหรับดูประกอบ:")
-    data_matrix = {
-        "โรงงาน \\ ตลาด": ["D", "E", "F", "Demandรวม"],
-        "ตลาด A": ["5 บาท", "8 บาท", "9 บาท", "300"],
-        "ตลาด B": ["4 บาท", "4 บาท", "7 บาท", "200"],
-        "ตลาด C": ["3 บาท", "3 บาท", "5 บาท", "200"],
-        "Supplyรวม": ["100", "300", "300", "700"]
-    }
-    st.dataframe(pd.DataFrame(data_matrix), use_container_width=True)
+            # 1. ตัวเลขสรุปภาพรวม (Metrics)
+            col1, col2, col3 = st.columns(3)
+            col1.metric("จำนวนคำถามทั้งหมด", f"{len(df_logs)} ครั้ง")
+            col2.metric("จำนวนนักศึกษาที่เข้ามาถาม", f"{df_logs['Student_Name'].nunique()} คน")
+            col3.metric("บทเรียนที่ถามมากที่สุด", df_logs['Chapter'].mode()[0] if not df_logs.empty else "-")
+            
+            st.write("---")
+            
+            # 2. กราฟวิเคราะห์
+            st.subheader("📈 จำนวนคำถามแบ่งตามบทเรียน")
+            chapter_counts = df_logs['Chapter'].value_counts()
+            st.bar_chart(chapter_counts)
+            
+            st.write("---")
+            
+            # 3. ตารางตารางแสดงรายชื่อและคำถามทั้งหมด (History Log)
+            st.subheader("📋 ประวัติการถามคำถามของนักศึกษาทั้งหมด")
+            st.dataframe(df_logs.sort_values(by="Timestamp", ascending=False), use_container_width=True)
+            
+            # ปุ่มดาวน์โหลดไฟล์รายงานเป็น Excel/CSV
+            csv_data = df_logs.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 ดาวน์โหลดรายงาน (CSV File)",
+                data=csv_data,
+                file_name="student_questions_report.csv",
+                mime="text/csv"
+            )
+    elif password:
+        st.error("❌ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง")
